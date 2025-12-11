@@ -1,0 +1,8 @@
+# Zabbix多实例配置文件
+instances:
+  # 生产环境Zabbix实例
+  - name: "zabbix-prod"
+    url: "http://zabbix.example.com/api_jsonrpc.php"
+    auth_type: "password"
+    username: "admin"
+    password: "zabbix123"
