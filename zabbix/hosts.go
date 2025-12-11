@@ -6,6 +6,7 @@ import "fmt"
 func (c *ZabbixClient) GetHosts(groupID, hostName string) ([]map[string]interface{}, error) {
 	params := map[string]interface{}{
 		"output": []string{"hostid", "host", "name", "status", "available"},
+		"limit":  1000, // 限制返回数量，避免性能问题
 	}
 
 	if groupID != "" {
@@ -41,12 +42,40 @@ func (c *ZabbixClient) GetHosts(groupID, hostName string) ([]map[string]interfac
 // GetHostByName 根据主机名获取主机信息
 func (c *ZabbixClient) GetHostByName(hostName string) (map[string]interface{}, error) {
 	params := map[string]interface{}{
-		"output": "extend",
+		"output": []string{"hostid", "host", "name", "status", "available", "description", "lastaccess"},
 		"filter": map[string]string{
 			"host": hostName,
 		},
-		"selectGroups":     "extend",
-		"selectInterfaces": "extend",
+		"selectGroups":     []string{"groupid", "name", "internal"},
+		"selectInterfaces": []string{"interfaceid", "ip", "dns", "port", "type", "main", "useip"},
+	}
+
+	result, err := c.Call("host.get", params)
+	if err != nil {
+		return nil, err
+	}
+
+	hosts, ok := result.([]interface{})
+	if !ok || len(hosts) == 0 {
+		return nil, fmt.Errorf("主机不存在")
+	}
+
+	if host, ok := hosts[0].(map[string]interface{}); ok {
+		return host, nil
+	}
+
+	return nil, fmt.Errorf("响应格式错误")
+}
+
+// GetHostByNameLite 轻量级获取主机基本信息（不包含详细的组和接口信息）
+func (c *ZabbixClient) GetHostByNameLite(hostName string) (map[string]interface{}, error) {
+	params := map[string]interface{}{
+		"output": []string{"hostid", "host", "name", "status", "available", "description"},
+		"filter": map[string]string{
+			"host": hostName,
+		},
+		"selectGroups":     []string{"groupid", "name"},
+		"selectInterfaces": []string{"interfaceid", "ip", "dns", "port", "type", "main"},
 	}
 
 	result, err := c.Call("host.get", params)

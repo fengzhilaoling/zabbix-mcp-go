@@ -30,7 +30,7 @@ func NewZabbixClient(url, user, pass string) *ZabbixClient {
 		Pass:     pass,
 		AuthType: "password", // 默认为密码认证
 		HTTPClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second, // 增加到2分钟，避免复杂查询超时
 		},
 	}
 }

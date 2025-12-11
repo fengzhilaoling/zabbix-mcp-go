@@ -59,12 +59,16 @@ func getHostByNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	args := req.Params.Arguments
 	instanceName := ""
 	hostName := ""
+	detailed := false
 
 	if v, ok := args["instance"].(string); ok {
 		instanceName = v
 	}
 	if v, ok := args["host_name"].(string); ok {
 		hostName = v
+	}
+	if v, ok := args["detailed"].(bool); ok {
+		detailed = v
 	}
 
 	if hostName == "" {
@@ -76,7 +80,17 @@ func getHostByNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 		return nil, fmt.Errorf("未找到指定的实例")
 	}
 
-	host, err := client.GetHostByName(hostName)
+	// 根据detailed参数决定使用哪种查询方式
+	var host map[string]interface{}
+	var err error
+	if detailed {
+		GetSugar().Infof("使用详细模式获取主机信息: %s", hostName)
+		host, err = client.GetHostByName(hostName)
+	} else {
+		GetSugar().Infof("使用轻量级模式获取主机信息: %s", hostName)
+		host, err = client.GetHostByNameLite(hostName)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("获取主机信息失败: %v", err)
 	}
@@ -567,4 +581,49 @@ func getInstancesInfoHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp
 
 	resultData, _ := json.Marshal(instancesInfo)
 	return mcp.NewToolResultText(string(resultData)), nil
+}
+
+// getHostTemplatesHandler 获取指定主机的模板信息
+func getHostTemplatesHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Infof("调用getHostTemplatesHandler，参数: %+v", req.Params.Arguments)
+
+	args := req.Params.Arguments
+	instanceName := ""
+	hostID := ""
+
+	if v, ok := args["instance"].(string); ok {
+		instanceName = v
+	}
+	if v, ok := args["host_id"].(string); ok {
+		hostID = v
+	}
+
+	if hostID == "" {
+		return nil, fmt.Errorf("主机ID不能为空")
+	}
+
+	GetSugar().Infof("获取主机模板 - 实例: %s, 主机ID: %s", instanceName, hostID)
+
+	client := pool.GetClient(instanceName)
+	if client == nil {
+		GetSugar().Errorf("未找到指定的实例: %s", instanceName)
+		return nil, fmt.Errorf("未找到指定的实例")
+	}
+
+	templates, err := client.GetTemplatesByHost(hostID)
+	if err != nil {
+		GetSugar().Errorf("获取主机关联模板失败: %v", err)
+		return nil, fmt.Errorf("获取主机关联模板失败: %v", err)
+	}
+
+	GetSugar().Infof("成功获取主机 %s 的模板列表，共 %d 个模板", hostID, len(templates))
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: fmt.Sprintf("%v", templates),
+			},
+		},
+	}, nil
 }

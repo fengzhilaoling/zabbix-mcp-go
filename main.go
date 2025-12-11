@@ -37,6 +37,9 @@ func main() {
 
 	// 初始化Zabbix连接池
 	pool = zabbix.NewZabbixPool()
+	// 收集成功连接的实例名称
+	successfulInstances := make([]string, 0)
+
 	for _, instance := range AppConfig.Instances {
 		client := zabbix.NewZabbixClient(instance.URL, instance.User, instance.Pass)
 
@@ -68,8 +71,9 @@ func main() {
 		}
 
 		GetSugar().Infof("%s, 状态: 连接成功", instanceInfo)
+		successfulInstances = append(successfulInstances, instance.Name)
 	}
-	GetSugar().Infof("Zabbix连接池初始化完成，共添加 %d 个实例", len(AppConfig.Instances))
+	GetSugar().Infof("Zabbix连接池初始化完成，成功连接 %d 个实例: %v", len(successfulInstances), successfulInstances)
 
 	// 创建MCP服务器
 	s := server.NewMCPServer(

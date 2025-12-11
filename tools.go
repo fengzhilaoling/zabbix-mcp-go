@@ -21,6 +21,7 @@ func RegisterTools(s *server.MCPServer) {
 			mcp.WithDescription("根据主机名获取主机信息"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 			mcp.WithString("host_name", mcp.Required(), mcp.Description("主机名")),
+			mcp.WithBoolean("detailed", mcp.Description("是否获取详细信息（包含完整组、接口等数据），默认为false使用轻量级查询")),
 		),
 		getHostByNameHandler,
 	)
@@ -112,6 +113,14 @@ func RegisterTools(s *server.MCPServer) {
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 		),
 		getTemplatesHandler,
+	)
+	s.AddTool(
+		mcp.NewTool("get_host_templates",
+			mcp.WithDescription("获取指定主机的模板信息"),
+			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
+			mcp.WithString("host_id", mcp.Required(), mcp.Description("主机ID")),
+		),
+		getHostTemplatesHandler,
 	)
 	s.AddTool(
 		mcp.NewTool("link_template",
