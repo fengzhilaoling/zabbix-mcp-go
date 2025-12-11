@@ -10,6 +10,8 @@ import (
 
 // 工具处理器示例
 func getHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Infof("调用getHostsHandler，参数: %+v", req.Params.Arguments)
+
 	args := req.Params.Arguments
 	instanceName := ""
 	groupID := ""
@@ -25,15 +27,21 @@ func getHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		hostName = v
 	}
 
+	GetSugar().Infof("获取主机列表 - 实例: %s, 组ID: %s, 主机名: %s", instanceName, groupID, hostName)
+
 	client := pool.GetClient(instanceName)
 	if client == nil {
+		GetSugar().Errorf("未找到指定的实例: %s", instanceName)
 		return nil, fmt.Errorf("未找到指定的实例")
 	}
 
 	hosts, err := client.GetHosts(groupID, hostName)
 	if err != nil {
+		GetSugar().Errorf("获取主机列表失败: %v", err)
 		return nil, fmt.Errorf("获取主机列表失败: %v", err)
 	}
+
+	GetSugar().Infof("成功获取主机列表，共 %d 台主机", len(hosts))
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
@@ -46,6 +54,8 @@ func getHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 }
 
 func getHostByNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Infof("调用getHostByNameHandler，参数: %+v", req.Params.Arguments)
+
 	args := req.Params.Arguments
 	instanceName := ""
 	hostName := ""
@@ -82,6 +92,8 @@ func getHostByNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 }
 
 func createHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Infof("调用createHostHandler，参数: %+v", req.Params.Arguments)
+
 	args := req.Params.Arguments
 	instanceName := ""
 	hostName := ""
@@ -123,6 +135,8 @@ func createHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 }
 
 func deleteHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Infof("调用deleteHostHandler，参数: %+v", req.Params.Arguments)
+
 	args := req.Params.Arguments
 	instanceName := ""
 	hostID := ""
@@ -154,6 +168,8 @@ func deleteHostHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 }
 
 func getItemsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Infof("调用getItemsHandler，参数: %+v", req.Params.Arguments)
+
 	args := req.Params.Arguments
 	instanceName := ""
 	hostID := ""
