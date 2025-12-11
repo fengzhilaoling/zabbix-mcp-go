@@ -21,11 +21,13 @@ type Config struct {
 
 // ZabbixInstance Zabbix实例配置
 type ZabbixInstance struct {
-	Name    string `yaml:"name"`
-	URL     string `yaml:"url"`
-	User    string `yaml:"user"`
-	Pass    string `yaml:"pass"`
-	Default bool   `yaml:"default,omitempty"`
+	Name     string `yaml:"name"`
+	URL      string `yaml:"url"`
+	User     string `yaml:"username,omitempty"`
+	Pass     string `yaml:"password,omitempty"`
+	Token    string `yaml:"token,omitempty"`
+	AuthType string `yaml:"auth_type,omitempty"` // "password" 或 "token"
+	Default  bool   `yaml:"default,omitempty"`
 }
 
 var (
@@ -43,6 +45,12 @@ func main() {
 	pool = zabbix.NewZabbixPool()
 	for _, instance := range config.Instances {
 		client := zabbix.NewZabbixClient(instance.URL, instance.User, instance.Pass)
+
+		// 设置认证方式
+		if instance.AuthType == "token" && instance.Token != "" {
+			client.SetAuthToken(instance.Token)
+		}
+
 		if err := pool.AddInstance(instance.Name, client); err != nil {
 			log.Printf("添加实例 %s 失败: %v", instance.Name, err)
 			continue

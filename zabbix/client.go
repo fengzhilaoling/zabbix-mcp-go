@@ -16,6 +16,7 @@ type ZabbixClient struct {
 	User       string
 	Pass       string
 	AuthToken  string
+	AuthType   string // "password" 或 "token"
 	HTTPClient *http.Client
 	mu         sync.Mutex
 }
@@ -51,13 +52,29 @@ func (e *RPCError) Error() string {
 // NewZabbixClient 创建新的Zabbix客户端
 func NewZabbixClient(url, user, pass string) *ZabbixClient {
 	return &ZabbixClient{
-		URL:  url,
-		User: user,
-		Pass: pass,
+		URL:      url,
+		User:     user,
+		Pass:     pass,
+		AuthType: "password", // 默认为密码认证
 		HTTPClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 	}
+}
+
+// SetAuthToken 设置认证token
+func (c *ZabbixClient) SetAuthToken(token string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.AuthToken = token
+	c.AuthType = "token"
+}
+
+// SetAuthType 设置认证方式
+func (c *ZabbixClient) SetAuthType(authType string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.AuthType = authType
 }
 
 // Login 登录Zabbix API
@@ -65,6 +82,17 @@ func (c *ZabbixClient) Login() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	// 如果已经设置了token认证，直接验证token有效性
+	if c.AuthType == "token" && c.AuthToken != "" {
+		// 尝试调用一个简单的API来验证token是否有效
+		_, err := c.call("apiinfo.version", nil, c.AuthToken)
+		if err != nil {
+			return fmt.Errorf("token认证失败: %w", err)
+		}
+		return nil
+	}
+
+	// 密码认证
 	params := map[string]string{
 		"user":     c.User,
 		"password": c.Pass,
@@ -113,7 +141,8 @@ func (c *ZabbixClient) call(method string, params interface{}, auth string) (int
 		return nil, fmt.Errorf("序列化请求失败: %w", err)
 	}
 
-	resp, err := c.HTTPClient.Post(c.URL, "application/json", bytes.NewBuffer(requestData))
+	zabbix_url := c.URL + "/api_jsonrpc.php"
+	resp, err := c.HTTPClient.Post(zabbix_url, "application/json", bytes.NewBuffer(requestData))
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %w", err)
 	}
