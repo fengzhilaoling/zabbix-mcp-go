@@ -544,3 +544,27 @@ func switchInstanceHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	})
 	return mcp.NewToolResultText(string(resultData)), nil
 }
+
+// getInstancesInfoHandler 获取所有实例详细信息
+func getInstancesInfoHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	GetSugar().Info("调用getInstancesInfoHandler")
+
+	if pool == nil {
+		return mcp.NewToolResultError("Zabbix连接池未初始化"), nil
+	}
+
+	// 获取所有实例信息
+	instancesInfo := pool.GetAllInstancesInfo()
+
+	// 记录详细日志
+	if instances, ok := instancesInfo["instances"].([]map[string]interface{}); ok {
+		for _, instance := range instances {
+			GetSugar().Infof("实例信息 - 名称: %s, 地址: %s, 认证方式: %s, 状态: %s, 版本: %s, 默认实例: %v",
+				instance["name"], instance["url"], instance["auth_type"],
+				instance["status"], instance["version"], instance["is_default"])
+		}
+	}
+
+	resultData, _ := json.Marshal(instancesInfo)
+	return mcp.NewToolResultText(string(resultData)), nil
+}

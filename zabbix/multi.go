@@ -320,3 +320,25 @@ func (p *ZabbixPool) QueryHealthyInstances(method string, params interface{}) []
 
 	return results
 }
+
+// GetAllInstancesInfo 获取所有实例的详细信息
+func (p *ZabbixPool) GetAllInstancesInfo() map[string]interface{} {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	result := make(map[string]interface{})
+	instances := make([]map[string]interface{}, 0)
+
+	for name, client := range p.instances {
+		info := client.GetInstanceInfo()
+		info["name"] = name
+		info["is_default"] = (name == p.defaultInstance)
+		instances = append(instances, info)
+	}
+
+	result["instances"] = instances
+	result["total_count"] = len(instances)
+	result["default_instance"] = p.defaultInstance
+
+	return result
+}

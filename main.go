@@ -45,14 +45,29 @@ func main() {
 			client.SetAuthToken(instance.Token)
 		}
 
+		// 获取实例信息
+		instanceInfo := fmt.Sprintf("实例名称: %s, 地址: %s, 认证方式: %s",
+			instance.Name, instance.URL, instance.AuthType)
+
+		// 检测Zabbix版本
+		detector := zabbix.NewVersionDetector(client)
+		version, err := detector.DetectVersion()
+		if err != nil {
+			GetSugar().Warnf("%s, 状态: 版本检测失败 - %v", instanceInfo, err)
+		} else {
+			instanceInfo = fmt.Sprintf("%s, Zabbix版本: %s", instanceInfo, version.String())
+		}
+
 		if err := pool.AddInstance(instance.Name, client); err != nil {
-			GetSugar().Errorf("添加实例 %s 失败: %v", instance.Name, err)
+			GetSugar().Errorf("%s, 状态: 连接失败 - %v", instanceInfo, err)
 			continue
 		}
+
 		if instance.Default {
 			pool.SetDefault(instance.Name)
 		}
-		GetSugar().Infof("成功添加Zabbix实例: %s", instance.Name)
+
+		GetSugar().Infof("%s, 状态: 连接成功", instanceInfo)
 	}
 	GetSugar().Infof("Zabbix连接池初始化完成，共添加 %d 个实例", len(AppConfig.Instances))
 

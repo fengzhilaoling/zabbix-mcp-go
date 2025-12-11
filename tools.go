@@ -146,4 +146,12 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		switchInstanceHandler,
 	)
+
+	// 实例信息工具
+	s.AddTool(
+		mcp.NewTool("get_instances_info",
+			mcp.WithDescription("获取所有Zabbix实例的详细信息"),
+		),
+		getInstancesInfoHandler,
+	)
 }

@@ -16,6 +16,7 @@ func (c *ZabbixClient) Login() error {
 		c.AuthToken = ""
 
 		// 尝试调用apiinfo.version来验证连接是否正常
+		// apiinfo.version不需要认证，所以传入空auth参数
 		_, err := c.call("apiinfo.version", map[string]interface{}{}, "")
 
 		// 恢复AuthToken
@@ -33,7 +34,8 @@ func (c *ZabbixClient) Login() error {
 		"password": c.Pass,
 	}
 
-	response, err := c.call("user.login", params, "")
+	// 使用内部调用，传入空auth进行登录
+	response, err := c.callWithAuth("user.login", params, "")
 	if err != nil {
 		return fmt.Errorf("登录失败: %w", err)
 	}
