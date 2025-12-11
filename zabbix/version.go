@@ -28,7 +28,8 @@ func NewVersionDetector(client *ZabbixClient) *VersionDetector {
 // DetectVersion 检测Zabbix版本
 func (vd *VersionDetector) DetectVersion() (*VersionInfo, error) {
 	// 获取API版本信息 - 使用内部调用避免循环依赖
-	result, err := vd.client.callWithAuth("apiinfo.version", nil, "")
+	// Zabbix API要求params为空数组[]而不是nil
+	result, err := vd.client.callWithAuth("apiinfo.version", []interface{}{}, "")
 	if err != nil {
 		return nil, fmt.Errorf("获取API版本失败: %w", err)
 	}
@@ -92,13 +93,9 @@ func (vd *VersionDetector) parseVersion(versionStr string) (*VersionInfo, error)
 
 // getFullVersion 获取完整版本信息
 func (vd *VersionDetector) getFullVersion() (string, error) {
-	// 尝试获取更详细的版本信息
-	params := map[string]interface{}{
-		"output": "extend",
-	}
-
+	// apiinfo.version方法不接受任何参数，params必须为空数组
 	// 使用内部调用避免循环依赖
-	result, err := vd.client.callWithAuth("apiinfo.version", params, "")
+	result, err := vd.client.callWithAuth("apiinfo.version", []interface{}{}, "")
 	if err != nil {
 		return "", err
 	}
