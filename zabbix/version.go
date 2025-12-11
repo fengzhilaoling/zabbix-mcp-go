@@ -256,3 +256,111 @@ func (vd *VersionDetector) GetVersionSpecificEndpoint(endpoint string) string {
 func (v *VersionInfo) String() string {
 	return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
+
+// 在 version.go 中添加更详细的版本特性映射
+func (vd *VersionDetector) GetDetailedVersionFeatures() map[string]interface{} {
+	version, err := vd.DetectVersion()
+	if err != nil {
+		// 将 map[string]bool 转换为 map[string]interface{}
+		defaultFeatures := vd.getDefaultFeatures()
+		result := make(map[string]interface{})
+		for k, v := range defaultFeatures {
+			result[k] = v
+		}
+		return result
+	}
+
+	features := make(map[string]interface{})
+
+	// API端点支持
+	features["endpoints"] = map[string]bool{
+		"problem.get":    version.Major >= 4,
+		"sla.get":        version.Major >= 5,
+		"authentication": version.Major >= 7,
+		"connector":      version.Major >= 6,
+		"proxygroup":     version.Major >= 7,
+	}
+
+	// 参数支持
+	features["parameters"] = map[string]bool{
+		"selectTags":          version.Major >= 4,
+		"selectDependencies":  version.Major >= 4,
+		"selectPreprocessing": version.Major >= 4,
+		"templateSelectTags":  version.Major >= 5, // template.get
+	}
+
+	return features
+}
+
+// TestVersionCompatibility 版本兼容性测试函数
+func (vd *VersionDetector) TestVersionCompatibility() map[string]interface{} {
+	result := make(map[string]interface{})
+
+	// 测试版本检测
+	version, err := vd.DetectVersion()
+	if err != nil {
+		result["version_detection"] = map[string]string{
+			"status": "failed",
+			"error":  err.Error(),
+		}
+		return result
+	}
+
+	result["version"] = version.String()
+	result["features"] = vd.GetCompatibleFeatures()
+
+	// 测试关键API端点
+	endpoints := []string{"apiinfo.version", "host.get", "item.get", "trigger.get"}
+	if version.Major >= 4 {
+		endpoints = append(endpoints, "problem.get")
+	}
+	if version.Major >= 5 {
+		endpoints = append(endpoints, "sla.get")
+	}
+
+	endpointTests := make(map[string]string)
+	for _, endpoint := range endpoints {
+		_, err := vd.client.Call(endpoint, map[string]interface{}{"limit": 1})
+		if err != nil {
+			endpointTests[endpoint] = "failed: " + err.Error()
+		} else {
+			endpointTests[endpoint] = "success"
+		}
+	}
+
+	result["endpoint_tests"] = endpointTests
+	return result
+}
+
+// 添加版本迁移助手函数
+func (vd *VersionDetector) GetMigrationGuide(fromVersion, toVersion string) map[string]interface{} {
+	guide := make(map[string]interface{})
+
+	// 解析版本
+	fromVer, _ := vd.parseVersion(fromVersion)
+	toVer, _ := vd.parseVersion(toVersion)
+
+	if fromVer.Major < 4 && toVer.Major >= 4 {
+		guide["problem_management"] = map[string]string{
+			"old":         "trigger.get with specific parameters",
+			"new":         "problem.get",
+			"description": "使用专门的问题管理API替代触发器查询",
+		}
+	}
+
+	if fromVer.Major < 5 && toVer.Major >= 5 {
+		guide["sla_management"] = map[string]string{
+			"old":         "service.get with calculations",
+			"new":         "sla.get",
+			"description": "使用专门的SLA API",
+		}
+	}
+
+	return guide
+}
+
+// TestVersionCompatibility ZabbixClient的版本兼容性测试函数
+func (c *ZabbixClient) TestVersionCompatibility() map[string]interface{} {
+	detector := NewVersionDetector(c)
+	return detector.TestVersionCompatibility()
+}
