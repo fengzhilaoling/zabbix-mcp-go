@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -84,8 +85,16 @@ func (c *ZabbixClient) Login() error {
 
 	// 如果已经设置了token认证，直接验证token有效性
 	if c.AuthType == "token" && c.AuthToken != "" {
-		// 尝试调用一个简单的API来验证token是否有效
-		_, err := c.call("apiinfo.version", nil, c.AuthToken)
+		// 保存当前的AuthToken，临时清空它以调用不需要认证的API
+		savedToken := c.AuthToken
+		c.AuthToken = ""
+
+		// 尝试调用apiinfo.version来验证连接是否正常
+		_, err := c.call("apiinfo.version", map[string]interface{}{}, "")
+
+		// 恢复AuthToken
+		c.AuthToken = savedToken
+
 		if err != nil {
 			return fmt.Errorf("token认证失败: %w", err)
 		}
@@ -141,8 +150,16 @@ func (c *ZabbixClient) call(method string, params interface{}, auth string) (int
 		return nil, fmt.Errorf("序列化请求失败: %w", err)
 	}
 
-	zabbix_url := c.URL + "/api_jsonrpc.php"
-	resp, err := c.HTTPClient.Post(zabbix_url, "application/json", bytes.NewBuffer(requestData))
+	// 构建完整的API URL，如果URL中没有包含api_jsonrpc.php则自动添加
+	apiURL := c.URL
+	if !strings.Contains(apiURL, "api_jsonrpc.php") {
+		// 移除末尾的斜杠（如果有）
+		apiURL = strings.TrimRight(apiURL, "/")
+		// 添加API路径
+		apiURL = apiURL + "/api_jsonrpc.php"
+	}
+
+	resp, err := c.HTTPClient.Post(apiURL, "application/json", bytes.NewBuffer(requestData))
 	if err != nil {
 		return nil, fmt.Errorf("HTTP请求失败: %w", err)
 	}
