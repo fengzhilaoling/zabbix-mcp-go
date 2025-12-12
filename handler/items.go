@@ -164,17 +164,18 @@ func GetItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 
 	GetSugar().Infof("成功获取监控项 %s 的数据，共 %d 条历史记录", itemID, len(historyData))
 
-	// 计算统计信息
-	stats := calculateHistoryStats(historyData)
-	// 应用返回限制
+	// 处理历史数据并计算统计信息，同时保留原始数据返回
+	processedHistory, stats := processHistoryData(historyData)
+	// 应用返回限制（当前返回全部原始历史数据）
 	returnData := historyData
 	// 构建响应结果
 	result := map[string]interface{}{
-		"item":    item,
-		"history": returnData,
-		"count":   len(returnData),
-		"total":   len(historyData),
-		"stats":   stats,
+		"item":              item,
+		"history":           returnData,
+		"processed_history": processedHistory,
+		"count":             len(returnData),
+		"total":             len(historyData),
+		"stats":             stats,
 		"time_range": map[string]string{
 			"from": timeFrom,
 			"till": timeTill,
@@ -306,38 +307,84 @@ func parseTimeRange(timeRange string) (string, string, error) {
 }
 
 // calculateHistoryStats 计算历史数据的统计信息
-func calculateHistoryStats(historyData []map[string]interface{}) map[string]interface{} {
+// processHistoryData 对原始历史数据进行解析并计算统计信息。
+// 返回处理后的数据切片（每项增加 value_f: float64, time: string）和统计信息。
+func processHistoryData(historyData []map[string]interface{}) ([]map[string]interface{}, map[string]interface{}) {
+	processed := make([]map[string]interface{}, 0, len(historyData))
+
 	if len(historyData) == 0 {
-		return map[string]interface{}{
+		stats := map[string]interface{}{
 			"min":   0,
 			"max":   0,
 			"avg":   0,
 			"count": 0,
 		}
+		return processed, stats
 	}
 
 	var sum, min, max float64
 	var count int
-	var firstValue = true
+	firstValue := true
 
 	for _, data := range historyData {
+		// 拷贝原始数据到新 map，避免修改原切片的内容
+		p := make(map[string]interface{}, len(data)+2)
+		for k, v := range data {
+			p[k] = v
+		}
+
+		// 解析 value（通常为字符串）到 float64
+		var valueF float64
 		if valueStr, ok := data["value"].(string); ok {
-			if value, err := strconv.ParseFloat(valueStr, 64); err == nil {
+			if v, err := strconv.ParseFloat(valueStr, 64); err == nil {
+				valueF = v
+				// 更新统计
 				if firstValue {
-					min, max = value, value
+					min, max = v, v
 					firstValue = false
 				} else {
-					if value < min {
-						min = value
+					if v < min {
+						min = v
 					}
-					if value > max {
-						max = value
+					if v > max {
+						max = v
 					}
 				}
-				sum += value
+				sum += v
 				count++
 			}
+		} else if vf, ok := data["value"].(float64); ok {
+			// 有时可能已经是 float64
+			valueF = vf
+			if firstValue {
+				min, max = vf, vf
+				firstValue = false
+			} else {
+				if vf < min {
+					min = vf
+				}
+				if vf > max {
+					max = vf
+				}
+			}
+			sum += vf
+			count++
 		}
+
+		p["value_f"] = valueF
+
+		// 解析 clock（时间戳，通常为字符串表示的 unix 秒数）
+		if clockStr, ok := data["clock"].(string); ok {
+			if sec, err := strconv.ParseInt(clockStr, 10, 64); err == nil {
+				t := time.Unix(sec, 0)
+				p["time"] = t.Format("2006-01-02 15:04:05")
+			}
+		} else if clockNum, ok := data["clock"].(float64); ok {
+			t := time.Unix(int64(clockNum), 0)
+			p["time"] = t.Format("2006-01-02 15:04:05")
+		}
+
+		processed = append(processed, p)
 	}
 
 	avg := 0.0
@@ -345,10 +392,12 @@ func calculateHistoryStats(historyData []map[string]interface{}) map[string]inte
 		avg = sum / float64(count)
 	}
 
-	return map[string]interface{}{
+	stats := map[string]interface{}{
 		"min":   math.Round(min*100) / 100,
 		"max":   math.Round(max*100) / 100,
 		"avg":   math.Round(avg*100) / 100,
 		"count": count,
 	}
+	GetSugar().Infof("历史数据统计信息: %v", stats)
+	return processed, stats
 }

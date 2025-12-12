@@ -114,27 +114,47 @@ func (c *ZabbixClient) GetItemDataWithTimeRange(itemID string, history int, time
 	}
 
 	// 添加时间范围参数 - 将时间字符串转换为 Unix 时间戳
-	if timeFrom != "" {
-		// 尝试解析时间字符串并转换为 Unix 时间戳
-		if t, err := time.Parse("2006-01-02 15:04:05", timeFrom); err == nil {
-			params["time_from"] = t.Unix()
-		} else {
-			// 如果解析失败，尝试直接作为 Unix 时间戳字符串
-			if timestamp, err := strconv.ParseInt(timeFrom, 10, 64); err == nil {
-				params["time_from"] = timestamp
+	// 解析时间范围并转换为 Unix 时间戳。
+	// 优先使用 client 配置的 ServerTZ（Zabbix 服务器时区）解析无时区信息的时间字符串，
+	// 否则使用本地时区。若时间字符串中包含时区信息或符合 RFC3339，则直接解析。
+	parseTimeToUnix := func(ts string) (int64, bool) {
+		if ts == "" {
+			return 0, false
+		}
+
+		// 尝试直接解析为 RFC3339（带时区）格式
+		if t, err := time.Parse(time.RFC3339, ts); err == nil {
+			return t.Unix(), true
+		}
+
+		// 常见无时区格式
+		layout := "2006-01-02 15:04:05"
+
+		// 选择用于解析的时区
+		loc := time.Local
+		if c.ServerTZ != "" {
+			if l, err := time.LoadLocation(c.ServerTZ); err == nil {
+				loc = l
 			}
 		}
+
+		if t, err := time.ParseInLocation(layout, ts, loc); err == nil {
+			return t.Unix(), true
+		}
+
+		// 最后尝试把字符串当作 Unix 秒数
+		if timestamp, err := strconv.ParseInt(ts, 10, 64); err == nil {
+			return timestamp, true
+		}
+
+		return 0, false
 	}
-	if timeTill != "" {
-		// 尝试解析时间字符串并转换为 Unix 时间戳
-		if t, err := time.Parse("2006-01-02 15:04:05", timeTill); err == nil {
-			params["time_till"] = t.Unix()
-		} else {
-			// 如果解析失败，尝试直接作为 Unix 时间戳字符串
-			if timestamp, err := strconv.ParseInt(timeTill, 10, 64); err == nil {
-				params["time_till"] = timestamp
-			}
-		}
+
+	if unixFrom, ok := parseTimeToUnix(timeFrom); ok {
+		params["time_from"] = unixFrom
+	}
+	if unixTill, ok := parseTimeToUnix(timeTill); ok {
+		params["time_till"] = unixTill
 	}
 
 	method := "history.get"
@@ -148,7 +168,7 @@ func (c *ZabbixClient) GetItemDataWithTimeRange(itemID string, history int, time
 	if !ok {
 		return nil, fmt.Errorf("响应格式错误")
 	}
-
+	fmt.Println(data)
 	var dataList []map[string]interface{}
 	for _, d := range data {
 		if item, ok := d.(map[string]interface{}); ok {

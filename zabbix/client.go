@@ -13,11 +13,15 @@ import (
 
 // ZabbixClient Zabbix JSON-RPC客户端
 type ZabbixClient struct {
-	URL        string
-	User       string
-	Pass       string
-	AuthToken  string
-	AuthType   string // "password" 或 "token"
+	URL       string
+	User      string
+	Pass      string
+	AuthToken string
+	AuthType  string // "password" 或 "token"
+	// ServerTZ 可选，用于指定 Zabbix 服务器所使用的时区（如 "UTC", "Asia/Shanghai"）。
+	// 当解析时间字符串（无时区信息）时会使用该时区进行解析，保证发送给 API 的 Unix 时间戳
+	// 与 Zabbix 服务器期望的时区一致，从而避免因本地与 Zabbix 时区不同而导致的数据获取异常。
+	ServerTZ   string
 	HTTPClient *http.Client
 	mu         sync.Mutex
 }
@@ -28,11 +32,18 @@ func NewZabbixClient(url, user, pass string) *ZabbixClient {
 		URL:      url,
 		User:     user,
 		Pass:     pass,
+		ServerTZ: "",
 		AuthType: "password", // 默认为密码认证
 		HTTPClient: &http.Client{
 			Timeout: 120 * time.Second, // 增加到2分钟，避免复杂查询超时
 		},
 	}
+}
+
+// SetServerTimezone 设置 Zabbix 服务器时区（例如 "UTC" 或 "Asia/Shanghai"）。
+// 如果不设置，默认使用本地时区解析无时区信息的时间字符串。
+func (c *ZabbixClient) SetServerTimezone(tz string) {
+	c.ServerTZ = tz
 }
 
 // call 调用Zabbix API（内部方法）
