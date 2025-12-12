@@ -120,9 +120,8 @@ func (c *ZabbixClient) MassUnlinkTemplates(hostIDs, templateIDs []string) error 
 // GetTemplatesByHost 获取主机关联的模板
 func (c *ZabbixClient) GetTemplatesByHost(hostID string) ([]map[string]interface{}, error) {
 	params := map[string]interface{}{
-		"output":      []string{"templateid", "host", "name", "description"},
-		"selectHosts": "extend",
-		"hostids":     hostID,
+		"output":  []string{"templateid", "host", "name", "description"},
+		"hostids": hostID,
 	}
 
 	result, err := c.Call("template.get", params)

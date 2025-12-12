@@ -46,7 +46,7 @@ func RegisterTools(s *server.MCPServer) {
 
 	// 监控项相关工具
 	s.AddTool(
-		mcp.NewTool("get_items",
+		mcp.NewTool("get_host_items",
 			mcp.WithDescription("获取主机监控项"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 			mcp.WithString("host_id", mcp.Required(), mcp.Description("主机ID")),

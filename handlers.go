@@ -618,12 +618,30 @@ func getHostTemplatesHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp
 
 	GetSugar().Infof("成功获取主机 %s 的模板列表，共 %d 个模板", hostID, len(templates))
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: fmt.Sprintf("%v", templates),
-			},
-		},
-	}, nil
+	// 格式化模板数据，提取关键信息
+	var templateInfo []map[string]interface{}
+	for _, template := range templates {
+		info := map[string]interface{}{
+			"templateid":  template["templateid"],
+			"name":        template["name"],
+			"host":        template["host"],
+			"description": template["description"],
+		}
+		templateInfo = append(templateInfo, info)
+	}
+
+	// 返回结构化的JSON数据
+	result := map[string]interface{}{
+		"host_id":   hostID,
+		"count":     len(templateInfo),
+		"templates": templateInfo,
+	}
+
+	resultData, err := json.Marshal(result)
+	if err != nil {
+		GetSugar().Errorf("JSON序列化失败: %v", err)
+		return nil, fmt.Errorf("数据格式化失败: %v", err)
+	}
+
+	return mcp.NewToolResultText(string(resultData)), nil
 }
