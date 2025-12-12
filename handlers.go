@@ -204,19 +204,51 @@ func getItemsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		return nil, fmt.Errorf("未找到指定的实例")
 	}
 
+	GetSugar().Infof("开始获取主机 %s 的监控项", hostID)
 	items, err := client.GetItems(hostID)
 	if err != nil {
+		GetSugar().Errorf("获取监控项失败: %v", err)
 		return nil, fmt.Errorf("获取监控项失败: %v", err)
 	}
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: fmt.Sprintf("%v", items),
-			},
-		},
-	}, nil
+	GetSugar().Infof("从API获取到 %d 个监控项", len(items))
+
+	// 过滤确保只包含指定主机的监控项
+	var filteredItems []map[string]interface{}
+	for _, item := range items {
+		itemHostID, exists := item["hostid"].(string)
+		itemName, _ := item["name"].(string)
+		itemKey, _ := item["key_"].(string)
+
+		GetSugar().Debugf("检查监控项 - hostid: %s, name: %s, key: %s, 是否匹配目标hostid: %v",
+			itemHostID, itemName, itemKey, exists && itemHostID == hostID)
+
+		if exists && itemHostID == hostID {
+			filteredItems = append(filteredItems, item)
+			GetSugar().Debugf("添加监控项到结果: %s (%s)", itemName, itemKey)
+		} else {
+			if !exists {
+				GetSugar().Warnf("监控项缺少hostid字段: %v", item)
+			} else if itemHostID != hostID {
+				GetSugar().Warnf("监控项hostid不匹配 - 期望: %s, 实际: %s", hostID, itemHostID)
+			}
+		}
+	}
+
+	GetSugar().Infof("过滤后获取主机 %s 的监控项，共 %d 个", hostID, len(filteredItems))
+
+	// 构建结构化的返回数据
+	result := map[string]interface{}{
+		"host_id": hostID,
+		"count":   len(filteredItems),
+		"items":   filteredItems,
+	}
+
+	// 记录返回数据到日志
+	resultJSON := MustJSON(result)
+	GetSugar().Infof("返回监控项数据: %s", resultJSON)
+
+	return mcp.NewToolResultText(resultJSON), nil
 }
 
 func getItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -629,7 +661,7 @@ func getHostTemplatesHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		}
 		templateInfo = append(templateInfo, info)
 	}
-
+	GetSugar().Infof("返回模板信息: %v", MustJSON(templateInfo))
 	// 返回结构化的JSON数据
 	result := map[string]interface{}{
 		"host_id":   hostID,

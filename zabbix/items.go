@@ -9,22 +9,44 @@ func (c *ZabbixClient) GetItems(hostID string) ([]map[string]interface{}, error)
 		"hostids":            hostID,
 		"selectApplications": "extend",
 		"selectTriggers":     "extend",
+		"preservekeys":       1, // 保持关联数组格式，便于验证
 	}
 
 	result, err := c.Call("item.get", params)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("API调用失败: %v", err)
+	}
+
+	// 检查响应格式
+	if result == nil {
+		return []map[string]interface{}{}, nil // 返回空数组而不是错误
 	}
 
 	items, ok := result.([]interface{})
 	if !ok {
-		return nil, fmt.Errorf("响应格式错误")
+		// 尝试其他可能的格式
+		if itemMap, ok := result.(map[string]interface{}); ok {
+			// 如果是map格式，转换为数组
+			var itemList []map[string]interface{}
+			for _, item := range itemMap {
+				if itemData, ok := item.(map[string]interface{}); ok {
+					if itemHostID, exists := itemData["hostid"].(string); exists && itemHostID == hostID {
+						itemList = append(itemList, itemData)
+					}
+				}
+			}
+			return itemList, nil
+		}
+		return nil, fmt.Errorf("响应格式错误: 期望数组，得到 %T", result)
 	}
 
 	var itemList []map[string]interface{}
 	for _, i := range items {
 		if item, ok := i.(map[string]interface{}); ok {
-			itemList = append(itemList, item)
+			// 双重验证：确保监控项确实属于指定主机
+			if itemHostID, exists := item["hostid"].(string); exists && itemHostID == hostID {
+				itemList = append(itemList, item)
+			}
 		}
 	}
 
