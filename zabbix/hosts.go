@@ -14,9 +14,10 @@ func (c *ZabbixClient) GetHosts(groupID, hostName string) ([]map[string]interfac
 	}
 
 	if hostName != "" {
-		params["filter"] = map[string]string{
+		params["search"] = map[string]string{
 			"host": hostName,
 		}
+		params["searchWildcardsEnabled"] = true
 	}
 
 	result, err := c.Call("host.get", params)
@@ -37,6 +38,75 @@ func (c *ZabbixClient) GetHosts(groupID, hostName string) ([]map[string]interfac
 	}
 
 	return hostList, nil
+}
+
+// GetHostsWithPagination 获取主机列表（支持分页）
+func (c *ZabbixClient) GetHostsWithPagination(groupID, hostName string, page, pageSize int) ([]map[string]interface{}, int, error) {
+	// 先获取总数
+	countParams := map[string]interface{}{
+		"countOutput": true,
+	}
+
+	if groupID != "" {
+		countParams["groupids"] = groupID
+	}
+
+	if hostName != "" {
+		countParams["search"] = map[string]string{
+			"host": hostName,
+		}
+		countParams["searchWildcardsEnabled"] = true
+	}
+
+	result, err := c.Call("host.get", countParams)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	total, ok := result.(string)
+	if !ok {
+		return nil, 0, fmt.Errorf("获取总数响应格式错误")
+	}
+
+	var totalCount int
+	fmt.Sscanf(total, "%d", &totalCount)
+
+	// 获取分页数据
+	params := map[string]interface{}{
+		"output": []string{"hostid", "host", "name", "status", "available"},
+		"limit":  pageSize,
+		"offset": (page - 1) * pageSize,
+	}
+
+	if groupID != "" {
+		params["groupids"] = groupID
+	}
+
+	if hostName != "" {
+		params["search"] = map[string]string{
+			"host": hostName,
+		}
+		params["searchWildcardsEnabled"] = true
+	}
+
+	result, err = c.Call("host.get", params)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	hosts, ok := result.([]interface{})
+	if !ok {
+		return nil, 0, fmt.Errorf("响应格式错误")
+	}
+
+	var hostList []map[string]interface{}
+	for _, h := range hosts {
+		if host, ok := h.(map[string]interface{}); ok {
+			hostList = append(hostList, host)
+		}
+	}
+
+	return hostList, totalCount, nil
 }
 
 // GetHostByName 根据主机名获取主机信息

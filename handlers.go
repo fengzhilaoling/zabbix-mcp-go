@@ -17,6 +17,8 @@ func getHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	instanceName := ""
 	groupID := ""
 	hostName := ""
+	page := 1
+	pageSize := 20
 
 	if v, ok := args["instance"].(string); ok {
 		instanceName = v
@@ -27,8 +29,14 @@ func getHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	if v, ok := args["host_name"].(string); ok {
 		hostName = v
 	}
+	if v, ok := args["page"].(float64); ok && v > 0 {
+		page = int(v)
+	}
+	if v, ok := args["page_size"].(float64); ok && v > 0 && v <= 100 {
+		pageSize = int(v)
+	}
 
-	GetSugar().Infof("获取主机列表 - 实例: %s, 组ID: %s, 主机名: %s", instanceName, groupID, hostName)
+	GetSugar().Infof("获取主机列表 - 实例: %s, 组ID: %s, 主机名: %s, 页码: %d, 每页数量: %d", instanceName, groupID, hostName, page, pageSize)
 
 	client := pool.GetClient(instanceName)
 	if client == nil {
@@ -36,19 +44,37 @@ func getHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		return nil, fmt.Errorf("未找到指定的实例")
 	}
 
-	hosts, err := client.GetHosts(groupID, hostName)
+	hosts, total, err := client.GetHostsWithPagination(groupID, hostName, page, pageSize)
 	if err != nil {
 		GetSugar().Errorf("获取主机列表失败: %v", err)
 		return nil, fmt.Errorf("获取主机列表失败: %v", err)
 	}
 
-	GetSugar().Infof("成功获取主机列表，共 %d 台主机", len(hosts))
+	totalPages := (total + pageSize - 1) / pageSize
+	GetSugar().Infof("成功获取主机列表，共 %d 台主机，当前第 %d 页，共 %d 页", len(hosts), page, totalPages)
+
+	// 构建分页响应结果
+	result := map[string]interface{}{
+		"hosts": hosts,
+		"pagination": map[string]interface{}{
+			"page":        page,
+			"page_size":   pageSize,
+			"total":       total,
+			"total_pages": totalPages,
+		},
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		GetSugar().Errorf("序列化结果失败: %v", err)
+		return nil, fmt.Errorf("序列化结果失败: %v", err)
+	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.TextContent{
 				Type: "text",
-				Text: fmt.Sprintf("%v", hosts),
+				Text: string(resultJSON),
 			},
 		},
 	}, nil
@@ -265,7 +291,7 @@ func getItemsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 
 	// 记录返回数据到日志
 	resultJSON := MustJSON(result)
-	GetSugar().Infof("返回监控项数据: %s", resultJSON)
+	// GetSugar().Infof("返回监控项数据: %s", resultJSON)
 
 	return mcp.NewToolResultText(resultJSON), nil
 }

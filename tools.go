@@ -8,14 +8,18 @@ import (
 func RegisterTools(s *server.MCPServer) {
 	// 主机相关工具
 	s.AddTool(
+		// 获取主机列表，支持分页
 		mcp.NewTool("get_hosts",
-			mcp.WithDescription("获取Zabbix主机列表"),
+			mcp.WithDescription("获取Zabbix主机列表，支持分页查询"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 			mcp.WithString("group_id", mcp.Description("主机组ID")),
-			mcp.WithString("host_name", mcp.Description("主机名筛选")),
+			mcp.WithString("host_name", mcp.Description("主机名模糊筛选，支持通配符*和?")),
+			mcp.WithNumber("page", mcp.DefaultNumber(1), mcp.Description("页码，默认为1")),
+			mcp.WithNumber("page_size", mcp.DefaultNumber(20), mcp.Description("每页数量，默认为20，最大100")),
 		),
 		getHostsHandler,
 	)
+	// info 主机名获取主机信息
 	s.AddTool(
 		mcp.NewTool("get_host_by_name",
 			mcp.WithDescription("根据主机名获取主机信息"),
@@ -25,6 +29,7 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		getHostByNameHandler,
 	)
+	// TODO 创建主机 测试
 	s.AddTool(
 		mcp.NewTool("create_host",
 			mcp.WithDescription("创建Zabbix主机"),
@@ -35,6 +40,7 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		createHostHandler,
 	)
+	// TODO 删除主机 测试
 	s.AddTool(
 		mcp.NewTool("delete_host",
 			mcp.WithDescription("删除Zabbix主机"),
@@ -46,6 +52,7 @@ func RegisterTools(s *server.MCPServer) {
 
 	// 监控项相关工具
 	s.AddTool(
+		// info 获取主机监控项 完成
 		mcp.NewTool("get_host_items",
 			mcp.WithDescription("获取主机监控项，支持监控项名称模糊匹配"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
@@ -54,6 +61,7 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		getItemsHandler,
 	)
+	// info 获取主机监控项 完成
 	s.AddTool(
 		mcp.NewTool("get_item_data",
 			mcp.WithDescription("获取监控项数据，支持通过监控项ID直接获取，或通过主机名+监控项名获取"),
@@ -66,6 +74,7 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		getItemDataHandler,
 	)
+	// TODO 创建监控项 测试
 	s.AddTool(
 		mcp.NewTool("create_item",
 			mcp.WithDescription("创建监控项"),
@@ -80,7 +89,7 @@ func RegisterTools(s *server.MCPServer) {
 		createItemHandler,
 	)
 
-	// 触发器相关工具
+	// TODO 触发器相关工具  测试
 	s.AddTool(
 		mcp.NewTool("get_triggers",
 			mcp.WithDescription("获取触发器列表"),
@@ -117,6 +126,7 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		getTemplatesHandler,
 	)
+	// info 获取模板信息 完成
 	s.AddTool(
 		mcp.NewTool("get_host_templates",
 			mcp.WithDescription("获取指定主机的模板信息"),
@@ -144,7 +154,7 @@ func RegisterTools(s *server.MCPServer) {
 		unlinkTemplateHandler,
 	)
 
-	// 多实例管理
+	// info 多实例管理 完成
 	s.AddTool(
 		mcp.NewTool("list_instances",
 			mcp.WithDescription("列出所有Zabbix实例"),
@@ -159,7 +169,7 @@ func RegisterTools(s *server.MCPServer) {
 		switchInstanceHandler,
 	)
 
-	// 实例信息工具
+	// info 实例信息工具 完成
 	s.AddTool(
 		mcp.NewTool("get_instances_info",
 			mcp.WithDescription("获取所有Zabbix实例的详细信息"),
