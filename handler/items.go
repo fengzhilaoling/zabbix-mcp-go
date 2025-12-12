@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 )
@@ -110,9 +112,7 @@ func GetItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	instanceName := ""
 	itemID := ""
 	history := 0
-	timeFrom := ""
-	timeTill := ""
-	limit := 100
+	timeRange := "1h"
 
 	if v, ok := args["instance"].(string); ok {
 		instanceName = v
@@ -123,27 +123,23 @@ func GetItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 	if v, ok := args["history"].(float64); ok {
 		history = int(v)
 	}
-	if v, ok := args["time_from"].(string); ok {
-		timeFrom = v
-	}
-	if v, ok := args["time_till"].(string); ok {
-		timeTill = v
-	}
-	if v, ok := args["limit"].(float64); ok && v > 0 && v <= 1000 {
-		limit = int(v)
+	if v, ok := args["time_range"].(string); ok {
+		timeRange = v
 	}
 
 	if itemID == "" {
 		return nil, fmt.Errorf("监控项ID不能为空")
 	}
 
-	// 显示时间参数（修复时间显示问题）
-	timeDisplay := ""
-	if timeFrom != "" || timeTill != "" {
-		timeDisplay = fmt.Sprintf(", 时间范围: %s 至 %s", timeFrom, timeTill)
+	// 解析时间范围
+	timeFrom, timeTill, err := parseTimeRange(timeRange)
+	if err != nil {
+		GetSugar().Errorf("解析时间范围失败: %v", err)
+		return nil, fmt.Errorf("解析时间范围失败: %v", err)
 	}
-	GetSugar().Infof("获取监控项数据 - 实例: %s, 监控项ID: %s, 历史数据类型: %d%s, 限制: %d",
-		instanceName, itemID, history, timeDisplay, limit)
+
+	GetSugar().Infof("获取监控项数据 - 实例: %s, 监控项ID: %s, 历史数据类型: %d, 时间范围: %s (%s 至 %s)",
+		instanceName, itemID, history, timeRange, timeFrom, timeTill)
 
 	clientRaw := pool.GetClient(instanceName)
 	if clientRaw == nil {
@@ -159,8 +155,8 @@ func GetItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		return nil, fmt.Errorf("获取监控项信息失败: %v", err)
 	}
 
-	// 获取监控项历史数据（先获取所有数据，再限制返回）
-	historyData, err := client.GetItemData(itemID, history, 0) // 0表示不限制获取数量
+	// 获取监控项历史数据（使用解析后的时间范围）
+	historyData, err := client.GetItemDataWithTimeRange(itemID, history, timeFrom, timeTill)
 	if err != nil {
 		GetSugar().Errorf("获取监控项历史数据失败: %v", err)
 		return nil, fmt.Errorf("获取监控项历史数据失败: %v", err)
@@ -170,13 +166,8 @@ func GetItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 
 	// 计算统计信息
 	stats := calculateHistoryStats(historyData)
-
 	// 应用返回限制
 	returnData := historyData
-	if limit > 0 && len(historyData) > limit {
-		returnData = historyData[:limit]
-	}
-
 	// 构建响应结果
 	result := map[string]interface{}{
 		"item":    item,
@@ -184,6 +175,10 @@ func GetItemDataHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Call
 		"count":   len(returnData),
 		"total":   len(historyData),
 		"stats":   stats,
+		"time_range": map[string]string{
+			"from": timeFrom,
+			"till": timeTill,
+		},
 	}
 
 	resultJSON, err := json.Marshal(result)
@@ -264,6 +259,50 @@ func CreateItemHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallT
 		"message": fmt.Sprintf("监控项 %s 创建成功", itemName),
 	})
 	return mcp.NewToolResultText(string(resultData)), nil
+}
+
+// parseTimeRange 解析时间范围字符串，返回开始和结束时间
+func parseTimeRange(timeRange string) (string, string, error) {
+	// 使用正则表达式解析时间范围格式
+	re := regexp.MustCompile(`^(\d+)([wdhms])$`)
+	matches := re.FindStringSubmatch(timeRange)
+
+	if len(matches) != 3 {
+		return "", "", fmt.Errorf("无效的时间范围格式: %s，支持格式如: 1w, 7d, 3d, 2h, 10m", timeRange)
+	}
+
+	amount, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return "", "", fmt.Errorf("解析时间数量失败: %v", err)
+	}
+
+	unit := matches[2]
+	var duration time.Duration
+
+	switch unit {
+	case "w":
+		duration = time.Duration(amount) * 7 * 24 * time.Hour
+	case "d":
+		duration = time.Duration(amount) * 24 * time.Hour
+	case "h":
+		duration = time.Duration(amount) * time.Hour
+	case "m":
+		duration = time.Duration(amount) * time.Minute
+	case "s":
+		duration = time.Duration(amount) * time.Second
+	default:
+		return "", "", fmt.Errorf("不支持的时间单位: %s", unit)
+	}
+
+	// 计算时间范围
+	now := time.Now()
+	startTime := now.Add(-duration)
+
+	// 格式化为 Zabbix API 期望的格式 (YYYY-MM-DD HH:MM:SS)
+	timeFrom := startTime.Format("2006-01-02 15:04:05")
+	timeTill := now.Format("2006-01-02 15:04:05")
+
+	return timeFrom, timeTill, nil
 }
 
 // calculateHistoryStats 计算历史数据的统计信息

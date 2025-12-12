@@ -35,6 +35,7 @@ type ZabbixClient interface {
 	GetItems(hostID, itemNameFilter string) ([]map[string]interface{}, error)
 	GetItemInfo(itemID string) (map[string]interface{}, error)
 	GetItemData(itemID string, history, limit int) ([]map[string]interface{}, error)
+	GetItemDataWithTimeRange(itemID string, history int, timeFrom, timeTill string) ([]map[string]interface{}, error)
 	CreateItem(hostID, itemName, key, itemType, valueType, delay string) (string, error)
 
 	// 触发器相关
