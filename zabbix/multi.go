@@ -74,7 +74,7 @@ func (p *ZabbixPool) RemoveInstance(name string) error {
 }
 
 // GetClient 获取指定实例的客户端
-func (p *ZabbixPool) GetClient(instanceName string) *ZabbixClient {
+func (p *ZabbixPool) GetClient(instanceName string) interface{} {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 

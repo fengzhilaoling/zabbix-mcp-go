@@ -143,3 +143,23 @@ func (c *ZabbixClient) GetTemplatesByHost(hostID string) ([]map[string]interface
 
 	return templateList, nil
 }
+
+// LinkTemplates 关联模板到主机（单主机版本）
+func (c *ZabbixClient) LinkTemplates(hostID string, templateIDs []string) error {
+	return c.MassLinkTemplates([]string{hostID}, templateIDs)
+}
+
+// UnlinkTemplates 从主机移除模板（单主机版本）
+func (c *ZabbixClient) UnlinkTemplates(hostID string, templateIDs []string, clear bool) error {
+	if clear {
+		return c.MassUnlinkTemplates([]string{hostID}, templateIDs)
+	}
+	// 如果不清除，使用host.update方法
+	params := map[string]interface{}{
+		"hostid":          hostID,
+		"templates_clear": templateIDs,
+	}
+
+	_, err := c.Call("host.update", params)
+	return err
+}

@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"zabbix-mcp-go/handler"
 	"zabbix-mcp-go/zabbix"
 
 	"github.com/mark3labs/mcp-go/server"
@@ -74,6 +75,14 @@ func main() {
 		successfulInstances = append(successfulInstances, instance.Name)
 	}
 	GetSugar().Infof("Zabbix连接池初始化完成，成功连接 %d 个实例: %v", len(successfulInstances), successfulInstances)
+
+	// 设置handler包的依赖
+	handler.SetDependencies(pool, GetSugar(), MustJSON, func(client interface{}) handler.ZabbixClient {
+		if zabbixClient, ok := client.(*zabbix.ZabbixClient); ok {
+			return zabbixClient
+		}
+		return nil
+	})
 
 	// 创建MCP服务器
 	s := server.NewMCPServer(
