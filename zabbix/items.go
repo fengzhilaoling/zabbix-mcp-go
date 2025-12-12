@@ -2,14 +2,26 @@ package zabbix
 
 import "fmt"
 
-// GetItems 获取主机监控项
-func (c *ZabbixClient) GetItems(hostID string) ([]map[string]interface{}, error) {
+// GetItems 获取主机监控项，支持监控项名称模糊匹配
+func (c *ZabbixClient) GetItems(hostID string, itemNameFilter string) ([]map[string]interface{}, error) {
 	params := map[string]interface{}{
 		"output":             "extend",
 		"hostids":            hostID,
 		"selectApplications": "extend",
 		"selectTriggers":     "extend",
 		"preservekeys":       1, // 保持关联数组格式，便于验证
+	}
+
+	// 如果提供了监控项名称过滤条件，添加模糊匹配
+	if itemNameFilter != "" {
+		// 添加通配符以实现真正的模糊匹配
+		searchPattern := fmt.Sprintf("*%s*", itemNameFilter)
+		params["search"] = map[string]interface{}{
+			"name": searchPattern,
+			"key_": searchPattern, // 同时搜索监控项键值
+		}
+		params["searchWildcardsEnabled"] = 1 // 启用通配符搜索
+		params["searchByAny"] = 1            // 匹配任意字段即可
 	}
 
 	result, err := c.Call("item.get", params)
@@ -149,6 +161,30 @@ func (c *ZabbixClient) GetItemByKey(hostID, key string) (map[string]interface{},
 		"filter": map[string]string{
 			"key_": key,
 		},
+	}
+
+	result, err := c.Call("item.get", params)
+	if err != nil {
+		return nil, err
+	}
+
+	items, ok := result.([]interface{})
+	if !ok || len(items) == 0 {
+		return nil, fmt.Errorf("监控项不存在")
+	}
+
+	if item, ok := items[0].(map[string]interface{}); ok {
+		return item, nil
+	}
+
+	return nil, fmt.Errorf("响应格式错误")
+}
+
+// GetItemInfo 根据监控项ID获取监控项详细信息
+func (c *ZabbixClient) GetItemInfo(itemID string) (map[string]interface{}, error) {
+	params := map[string]interface{}{
+		"output":  "extend",
+		"itemids": itemID,
 	}
 
 	result, err := c.Call("item.get", params)

@@ -47,17 +47,20 @@ func RegisterTools(s *server.MCPServer) {
 	// 监控项相关工具
 	s.AddTool(
 		mcp.NewTool("get_host_items",
-			mcp.WithDescription("获取主机监控项"),
+			mcp.WithDescription("获取主机监控项，支持监控项名称模糊匹配"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 			mcp.WithString("host_id", mcp.Required(), mcp.Description("主机ID")),
+			mcp.WithString("item_name", mcp.Description("监控项名称模糊匹配，不传入则获取所有监控项")),
 		),
 		getItemsHandler,
 	)
 	s.AddTool(
 		mcp.NewTool("get_item_data",
-			mcp.WithDescription("获取监控项数据"),
+			mcp.WithDescription("获取监控项数据，支持通过监控项ID直接获取，或通过主机名+监控项名获取"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
-			mcp.WithString("item_id", mcp.Required(), mcp.Description("监控项ID")),
+			mcp.WithString("item_id", mcp.Description("监控项ID，与host_name+item_name二选一")),
+			mcp.WithString("host_name", mcp.Description("主机名，与item_name配合使用")),
+			mcp.WithString("item_name", mcp.Description("监控项名称，与host_name配合使用")),
 			mcp.WithNumber("history", mcp.DefaultNumber(0), mcp.Description("历史数据类型")),
 			mcp.WithNumber("limit", mcp.DefaultNumber(100), mcp.Description("数据条数限制")),
 		),

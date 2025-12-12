@@ -148,6 +148,33 @@ func (c *ZabbixClient) UpdateHost(hostID string, params map[string]interface{}) 
 	return err
 }
 
+// GetHostByID 根据主机ID获取主机信息
+func (c *ZabbixClient) GetHostByID(hostID string) ([]map[string]interface{}, error) {
+	params := map[string]interface{}{
+		"output":  "extend",
+		"hostids": hostID,
+	}
+
+	result, err := c.Call("host.get", params)
+	if err != nil {
+		return nil, err
+	}
+
+	hosts, ok := result.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("响应格式错误")
+	}
+
+	var hostList []map[string]interface{}
+	for _, h := range hosts {
+		if host, ok := h.(map[string]interface{}); ok {
+			hostList = append(hostList, host)
+		}
+	}
+
+	return hostList, nil
+}
+
 // GetHostGroups 获取主机组列表
 func (c *ZabbixClient) GetHostGroups() ([]map[string]interface{}, error) {
 	params := map[string]interface{}{
