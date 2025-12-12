@@ -9,7 +9,7 @@ import (
 func RegisterTools(s *server.MCPServer) {
 	// 主机相关工具
 	s.AddTool(
-		// info 获取主机列表，支持分页
+		// 获取主机列表
 		mcp.NewTool("get_hosts",
 			mcp.WithDescription("获取Zabbix主机列表，支持分页查询"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
@@ -20,13 +20,12 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		GetHostsHandler,
 	)
-	// info 主机名获取主机信息
+	// 主机名获取主机信息
 	s.AddTool(
 		mcp.NewTool("get_host_by_name",
 			mcp.WithDescription("根据主机名获取主机信息"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
 			mcp.WithString("host_name", mcp.Required(), mcp.Description("主机名")),
-			mcp.WithBoolean("detailed", mcp.Description("是否获取详细信息（包含完整组、接口等数据），默认为false使用轻量级查询")),
 		),
 		GetHostByNameHandler,
 	)
@@ -53,7 +52,7 @@ func RegisterTools(s *server.MCPServer) {
 
 	// 监控项相关工具
 	s.AddTool(
-		// info 获取主机监控项 完成
+		// 获取主机监控项 完成
 		mcp.NewTool("get_host_items",
 			mcp.WithDescription("获取主机监控项，支持监控项名称模糊匹配"),
 			mcp.WithString("instance", mcp.Description("Zabbix实例名称")),
@@ -62,7 +61,7 @@ func RegisterTools(s *server.MCPServer) {
 		),
 		GetItemsHandler,
 	)
-	// info 获取主机监控项 完成
+	// 获取主机监控项数据支持时间范围
 	s.AddTool(
 		mcp.NewTool("get_item_data",
 			mcp.WithDescription("获取监控项数据，通过监控项ID获取数据"),

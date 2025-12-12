@@ -168,7 +168,6 @@ func (c *ZabbixClient) GetItemDataWithTimeRange(itemID string, history int, time
 	if !ok {
 		return nil, fmt.Errorf("响应格式错误")
 	}
-	fmt.Println(data)
 	var dataList []map[string]interface{}
 	for _, d := range data {
 		if item, ok := d.(map[string]interface{}); ok {

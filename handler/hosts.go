@@ -35,7 +35,7 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 		pageSize = int(v)
 	}
 
-	GetSugar().Infof("获取主机列表 - 实例: %s, 组ID: %s, 主机名: %s, 页码: %d, 每页数量: %d", instanceName, groupID, hostName, page, pageSize)
+	GetSugar().Infof("获取主机列表 - 实例: %s, 组ID: %s, 主机名: %s", instanceName, groupID, hostName)
 
 	clientRaw := pool.GetClient(instanceName)
 	if clientRaw == nil {
@@ -52,21 +52,23 @@ func GetHostsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	}
 
 	total := len(allHosts)
-	totalPages := (total + pageSize - 1) / pageSize
-
-	// 计算分页范围
-	start := (page - 1) * pageSize
-	end := start + pageSize
-	if end > total {
-		end = total
-	}
-
 	var hosts []map[string]interface{}
-	if start < total {
-		hosts = allHosts[start:end]
+	totalPages := 1
+	if total > 50 {
+		totalPages = (total + pageSize - 1) / pageSize
+
+		// 计算分页范围
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if end > total {
+			end = total
+		}
+		if start < total {
+			hosts = allHosts[start:end]
+		}
 	}
 
-	GetSugar().Infof("成功获取主机列表，共 %d 台主机，当前第 %d 页，共 %d 页", len(hosts), page, totalPages)
+	GetSugar().Infof("成功获取主机列表，共 %d 台主机，当前第 %d 页，共 %d 页", total, page, totalPages)
 
 	// 构建分页响应结果
 	result := map[string]interface{}{
@@ -102,16 +104,12 @@ func GetHostByNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	args := req.Params.Arguments
 	instanceName := ""
 	hostName := ""
-	detailed := false
 
 	if v, ok := args["instance"].(string); ok {
 		instanceName = v
 	}
 	if v, ok := args["host_name"].(string); ok {
 		hostName = v
-	}
-	if v, ok := args["detailed"].(bool); ok {
-		detailed = v
 	}
 
 	if hostName == "" {
@@ -124,29 +122,22 @@ func GetHostByNameHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	}
 	client := getZabbixClient(clientRaw)
 
-	// 根据detailed参数决定使用哪种查询方式
-	var host map[string]interface{}
-	var err error
-	if detailed {
-		GetSugar().Infof("使用详细模式获取主机信息: %s", hostName)
-		host, err = client.GetHostByName(hostName)
-	} else {
-		GetSugar().Infof("使用轻量级模式获取主机信息: %s", hostName)
-		host, err = client.GetHostByNameLite(hostName)
-	}
+	// 取消 detailed 参数，统一使用轻量级查询（已验证两种模式返回一致）
+	GetSugar().Infof("使用轻量级模式获取主机信息: %s", hostName)
+	host, err := client.GetHostByNameLite(hostName)
 
 	if err != nil {
 		return nil, fmt.Errorf("获取主机信息失败: %v", err)
 	}
 
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			mcp.TextContent{
-				Type: "text",
-				Text: fmt.Sprintf("%v", host),
-			},
-		},
-	}, nil
+	// 将主机信息序列化为 JSON 返回
+	resultData, err := json.Marshal(host)
+	if err != nil {
+		GetSugar().Errorf("JSON 序列化失败: %v", err)
+		return nil, fmt.Errorf("数据格式化失败: %v", err)
+	}
+
+	return mcp.NewToolResultText(string(resultData)), nil
 }
 
 // CreateHostHandler 创建主机

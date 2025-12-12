@@ -61,21 +61,23 @@ func GetItemsHandler(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToo
 	}
 
 	total := len(allItems)
-	totalPages := (total + pageSize - 1) / pageSize
-
-	// 计算分页范围
-	start := (page - 1) * pageSize
-	end := start + pageSize
-	if end > total {
-		end = total
-	}
-
 	var items []map[string]interface{}
-	if start < total {
-		items = allItems[start:end]
+	totalPages := 1
+	if total > 50 {
+		totalPages = (total + pageSize - 1) / pageSize
+
+		// 计算分页范围
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if end > total {
+			end = total
+		}
+		if start < total {
+			items = allItems[start:end]
+		}
 	}
 
-	GetSugar().Infof("成功获取监控项列表，共 %d 个监控项，当前第 %d 页，共 %d 页", len(items), page, totalPages)
+	GetSugar().Infof("成功获取监控项列表，共 %d 个监控项，当前第 %d 页，共 %d 页", total, page, totalPages)
 
 	// 构建分页响应结果
 	result := map[string]interface{}{
